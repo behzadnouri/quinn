@@ -340,6 +340,9 @@ fn send(state: &UdpSocketState, io: SockRef<'_>, transmits: &[Transmit]) -> io::
     Ok(sent)
 }
 
+static SENDMMSG_BATCH_SIZE: AtomicUsize = AtomicUsize::new(0);
+static SENDMMSG_BATCH_SIZE_COUNT: AtomicUsize = AtomicUsize::new(0);
+
 /// Implementation of `sendmmsg` with a fallback
 /// to `sendmsg` if syscall is not available.
 ///
@@ -359,6 +362,16 @@ unsafe fn sendmmsg_with_fallback(
         if ret != -1 {
             if ret as libc::c_uint != vlen {
                 tracing::error!("sendmmsg: {vlen} vs {ret}");
+            }
+            let old = SENDMMSG_BATCH_SIZE.fetch_max(ret as usize, Ordering::Relaxed);
+            if old < ret as usize {
+                SENDMMSG_BATCH_SIZE_COUNT.store(1, Ordering::Relaxed);
+                tracing::error!("sendmmsg batch size: {ret}");
+            } else if old == ret as usize {
+                let count = SENDMMSG_BATCH_SIZE_COUNT.fetch_add(1, Ordering::Relaxed);
+                if count % 1 == 0 {
+                    tracing::error!("sendmmsg batch size: {ret}, {count}");
+                }
             }
         }
         if ret != -1 {
@@ -472,6 +485,9 @@ fn recv(io: SockRef<'_>, bufs: &mut [IoSliceMut<'_>], meta: &mut [RecvMeta]) -> 
     Ok(1)
 }
 
+static RECVMMSG_BATCH_SIZE: AtomicUsize = AtomicUsize::new(0);
+static RECVMMSG_BATCH_SIZE_COUNT: AtomicUsize = AtomicUsize::new(0);
+
 /// Implementation of `recvmmsg` with a fallback
 /// to `recvmsg` if syscall is not available.
 ///
@@ -490,6 +506,18 @@ unsafe fn recvmmsg_with_fallback(
     {
         let ret =
             libc::syscall(libc::SYS_recvmmsg, sockfd, msgvec, vlen, flags, timeout) as libc::c_int;
+        if ret != -1 {
+            let old = RECVMMSG_BATCH_SIZE.fetch_max(ret as usize, Ordering::Relaxed);
+            if old < ret as usize {
+                RECVMMSG_BATCH_SIZE_COUNT.store(1, Ordering::Relaxed);
+                tracing::error!("recvmmsg batch size: {ret}");
+            } else if old == ret as usize {
+                let count = RECVMMSG_BATCH_SIZE_COUNT.fetch_add(1, Ordering::Relaxed);
+                if count % 1 == 0 {
+                    tracing::error!("recvmmsg batch size: {ret}, {count}");
+                }
+            }
+        }
         if ret != -1 {
             return ret;
         }
