@@ -7,3 +7,9 @@ debug = true
 
 [profile.release]
 debug = true
+
+[profile.release.package."*"]
+debug = true
+
+[profile.release.build-override]
+debug = true
