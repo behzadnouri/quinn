@@ -483,8 +483,7 @@ impl State {
             }
 
             if !self.send_limiter.allow_work() {
-                tracing::error!("!self.send_limiter.allow_work()");
-                break Ok(true);
+                tracing::error!("!self.send_limiter.allow_work() bypassed!");
             }
 
             match self.socket.poll_send(cx, self.outgoing.as_slices().0) {
