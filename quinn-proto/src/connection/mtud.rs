@@ -1,6 +1,6 @@
 use crate::{packet::SpaceId, MtuDiscoveryConfig, MAX_UDP_PAYLOAD};
 use std::time::Instant;
-use tracing::trace;
+use tracing::*;
 
 /// Implements Datagram Packetization Layer Path Maximum Transmission Unit Discovery
 ///
@@ -102,7 +102,7 @@ impl MtuDiscovery {
             .and_then(|state| state.on_probe_acked(packet_number))
         {
             self.current_mtu = new_mtu;
-            trace!(current_mtu = self.current_mtu, "new MTU detected");
+            error!(current_mtu = self.current_mtu, "new MTU detected");
 
             self.black_hole_detector.on_probe_acked();
             true

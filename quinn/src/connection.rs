@@ -16,7 +16,6 @@ use proto::{ConnectionError, ConnectionHandle, ConnectionStats, Dir, StreamEvent
 use rustc_hash::FxHashMap;
 use thiserror::Error;
 use tokio::sync::{futures::Notified, mpsc, oneshot, Notify};
-use tracing::debug_span;
 
 use crate::{
     mutex::Mutex,
@@ -220,8 +219,6 @@ impl Future for ConnectionDriver {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         let conn = &mut *self.0.state.lock("poll");
 
-        let span = debug_span!("drive", id = conn.handle.0);
-        let _guard = span.enter();
 
         if let Err(e) = conn.process_conn_events(&self.0.shared, cx) {
             conn.terminate(e, &self.0.shared);
@@ -857,6 +854,9 @@ impl State {
         let max_datagrams = self.socket.max_transmit_segments();
 
         while let Some(t) = self.inner.poll_transmit(now, max_datagrams) {
+            if (t.contents.len() > 1280 && t.segment_size.is_none()) || t.segment_size > Some(1280) {
+                tracing::error!("drive_transmit, t.contents.len(): {}, segment_size: {:?}", t.contents.len(), t.segment_size);
+            }
             transmits += match t.segment_size {
                 None => 1,
                 Some(s) => (t.contents.len() + s - 1) / s, // round up

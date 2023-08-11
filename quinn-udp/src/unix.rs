@@ -357,6 +357,11 @@ unsafe fn sendmmsg_with_fallback(
     {
         let ret = libc::syscall(libc::SYS_sendmmsg, sockfd, msgvec, vlen, flags) as libc::c_int;
         if ret != -1 {
+            if ret as libc::c_uint != vlen {
+                tracing::error!("sendmmsg: {vlen} vs {ret}");
+            }
+        }
+        if ret != -1 {
             return ret;
         }
     }

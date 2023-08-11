@@ -562,14 +562,14 @@ impl Connection {
                 // We ignore data in this space, since the close message
                 // has higher priority
                 space_idx += 1;
-                continue;
+                continue; // while space_idx < spaces.len()
             }
 
             // Is there data or a close message to send in this space?
             let can_send = self.space_can_send(space_id);
             if can_send.is_empty() && !close {
                 space_idx += 1;
-                continue;
+                continue; // while space_idx < spaces.len()
             }
 
             let mut ack_eliciting = !self.spaces[space_id].pending.is_empty(&self.streams)
@@ -594,7 +594,7 @@ impl Connection {
                 // Is 1 more datagram allowed?
                 if buf_capacity >= self.path.current_mtu() as usize * max_datagrams {
                     // No more datagrams allowed
-                    break;
+                    break; // while space_idx < spaces.len()
                 }
 
                 // Anti-amplification is only based on `total_sent`, which gets
@@ -607,7 +607,7 @@ impl Connection {
                     self.path.current_mtu() as u64 * num_datagrams as u64 + 1,
                 ) {
                     trace!("blocked by anti-amplification");
-                    break;
+                    break; // while space_idx < spaces.len()
                 }
 
                 // Congestion control and pacing checks
@@ -627,7 +627,7 @@ impl Connection {
                         congestion_blocked = true;
                         // We continue instead of breaking here in order to avoid
                         // blocking loss probes queued for higher spaces.
-                        continue;
+                        continue; // while space_idx < spaces.len()
                     }
 
                     // Check whether the next datagram is blocked by pacing
@@ -643,7 +643,7 @@ impl Connection {
                         congestion_blocked = true;
                         // Loss probes should be subject to pacing, even though
                         // they are not congestion controlled.
-                        break;
+                        break; // while space_idx < spaces.len()
                     }
                 }
 
@@ -674,7 +674,7 @@ impl Connection {
                 num_datagrams += 1;
                 coalesce = true;
                 pad_datagram = false;
-            } else {
+            } else { // !coalesce || buf_capacity - buf_end < MIN_PACKET_SPACE
                 // We can append/coalesce the next packet into the current
                 // datagram.
                 // Finish current packet without adding extra padding
@@ -714,7 +714,7 @@ impl Connection {
                 space_id,
                 &mut buf,
                 buf_capacity,
-                (num_datagrams - 1) * (self.path.current_mtu() as usize),
+                (num_datagrams - 1) * (self.path.current_mtu() as usize), // datagram_start
                 ack_eliciting,
                 self,
                 self.version,
@@ -828,12 +828,12 @@ impl Connection {
 
             // Don't increment space_idx.
             // We stay in the current space and check if there is more data to send.
-        }
+        } // while space_idx < spaces.len() {
 
         // Finish the last packet
         if let Some(mut builder) = builder {
             if pad_datagram {
-                builder.pad_to(MIN_INITIAL_SIZE);
+                builder.pad_to(MIN_INITIAL_SIZE); // 1200
             }
             let last_packet_number = builder.exact_number;
             builder.finish_and_track(now, self, sent_frames, &mut buf);
@@ -844,8 +844,10 @@ impl Connection {
 
         self.app_limited = buf.is_empty() && !congestion_blocked;
 
+        #[allow(unreachable_code)]
         // Send MTU probe if necessary
         if buf.is_empty() && self.state.is_established() {
+            return None; // XXX
             let space_id = SpaceId::Data;
             let probe_size = match self
                 .path
@@ -891,7 +893,7 @@ impl Connection {
             num_datagrams = 1;
 
             trace!(?probe_size, "writing MTUD probe");
-        }
+        } // if buf.is_empty() && self.state.is_established() {
 
         if buf.is_empty() {
             return None;

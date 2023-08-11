@@ -483,6 +483,7 @@ impl State {
             }
 
             if !self.send_limiter.allow_work() {
+                tracing::error!("!self.send_limiter.allow_work()");
                 break Ok(true);
             }
 
