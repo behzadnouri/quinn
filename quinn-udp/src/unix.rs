@@ -726,7 +726,7 @@ fn decode_recv(
 
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
 // Chosen somewhat arbitrarily; might benefit from additional tuning.
-pub(crate) const BATCH_SIZE: usize = 32;
+pub(crate) const BATCH_SIZE: usize = 1024;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 pub(crate) const BATCH_SIZE: usize = 1;
